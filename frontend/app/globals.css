@@ -1,4 +1,5 @@
 :root {
+  /* Dark Theme (Default) */
   --background: #0f172a;
   --foreground: #f8fafc;
   --primary: #38bdf8;
@@ -11,6 +12,25 @@
   --input-bg: #1e293b;
   --glass: rgba(30, 41, 59, 0.7);
   --glass-border: rgba(255, 255, 255, 0.1);
+  --status-text: #94a3b8;
+  --source-bg: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --secondary: #e2e8f0;
+  --accent: #7c3aed;
+  --assistant-bubble: #ffffff;
+  --user-bubble: #e2e8f0;
+  --border: #cbd5e1;
+  --input-bg: #ffffff;
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --status-text: #64748b;
+  --source-bg: rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -27,6 +47,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .shell {
@@ -47,18 +68,19 @@ body {
   border-radius: 1rem;
   margin-bottom: 1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: background 0.3s, border 0.3s;
 }
 
 .panel h1 {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--primary);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .status {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--status-text);
 }
 
 .chatlog {
@@ -87,18 +109,26 @@ body {
   border-radius: 1.25rem;
   position: relative;
   animation: fadeIn 0.3s ease-out;
+  transition: background-color 0.3s, border 0.3s;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bubble.user {
   align-self: flex-end;
   background-color: var(--user-bubble);
   border-bottom-right-radius: 0.25rem;
-  color: #f1f5f9;
+  color: var(--foreground);
 }
 
 .bubble.assistant {
@@ -120,7 +150,6 @@ body {
 .row {
   display: flex;
   gap: 0.75rem;
-  margin-top: 1rem;
 }
 
 input {
@@ -129,9 +158,9 @@ input {
   border: 1px solid var(--border);
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
-  color: white;
+  color: var(--foreground);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.3s;
 }
 
 input:focus {
@@ -140,7 +169,7 @@ input:focus {
 
 button {
   background-color: var(--primary);
-  color: #0f172a;
+  color: white;
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 0.75rem;
@@ -174,7 +203,8 @@ button:disabled {
   margin-bottom: 0;
 }
 
-.markdown-content ul, .markdown-content ol {
+.markdown-content ul,
+.markdown-content ol {
   margin-bottom: 1rem;
   padding-left: 1.5rem;
 }
@@ -183,21 +213,27 @@ button:disabled {
   margin-bottom: 0.25rem;
 }
 
-.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
   color: var(--primary);
 }
 
 .markdown-content code {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.1);
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
   font-family: monospace;
 }
 
+[data-theme='dark'] .markdown-content code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .markdown-content pre {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: var(--secondary);
   padding: 1rem;
   border-radius: 0.5rem;
   overflow-x: auto;
@@ -232,12 +268,30 @@ details ul {
   list-style: none;
   margin-top: 0.5rem;
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: var(--status-text);
 }
 
 details li {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.5rem;
+  background: var(--source-bg);
+  padding: 0.75rem;
   border-radius: 0.5rem;
   margin-bottom: 0.5rem;
+  border: 1px solid var(--glass-border);
+}
+
+.theme-toggle {
+  background: var(--secondary);
+  color: var(--foreground);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+}
+
+.theme-toggle:hover {
+  background: var(--border);
 }

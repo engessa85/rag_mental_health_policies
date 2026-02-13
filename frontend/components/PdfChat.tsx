@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Bot, User, FileText, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { Send, Bot, User, FileText, Moon, Sun } from "lucide-react";
 
 type Source = {
   content: string;
@@ -29,6 +29,8 @@ export default function PdfChat() {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [chat, setChat] = useState<ChatTurn[]>([]);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [mounted, setMounted] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const canAsk = useMemo(() => prompt.trim().length > 0 && !busy, [prompt, busy]);
@@ -38,8 +40,24 @@ export default function PdfChat() {
   };
 
   useEffect(() => {
+    setMounted(true);
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    }
+  }, []);
+
+  useEffect(() => {
     scrollToBottom();
   }, [chat]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+  };
 
   const handleAsk = async (e: FormEvent) => {
     e.preventDefault();
@@ -109,9 +127,11 @@ export default function PdfChat() {
     }
   };
 
+  if (!mounted) return null;
+
   return (
     <main className="shell">
-      <header className="panel">
+      <header className="panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <FileText size={32} color="var(--primary)" />
           <div>
@@ -119,6 +139,9 @@ export default function PdfChat() {
             <p className="status">Connected to: Book and policies.pdf</p>
           </div>
         </div>
+        <button onClick={toggleTheme} className="theme-toggle" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+          {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
       </header>
 
       <section className="chatlog">
