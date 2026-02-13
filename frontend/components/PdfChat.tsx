@@ -1,6 +1,9 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Send, Bot, User, FileText, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 
 type Source = {
   content: string;
@@ -16,12 +19,27 @@ type ChatTurn = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 
+// Helper to detect if text is predominantly Arabic (RTL)
+function getDirection(text: string): "rtl" | "ltr" {
+  const arabicPattern = /[\u0600-\u06FF]/;
+  return arabicPattern.test(text) ? "rtl" : "ltr";
+}
+
 export default function PdfChat() {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [chat, setChat] = useState<ChatTurn[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const canAsk = useMemo(() => prompt.trim().length > 0 && !busy, [prompt, busy]);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chat]);
 
   const handleAsk = async (e: FormEvent) => {
     e.preventDefault();
@@ -57,22 +75,26 @@ export default function PdfChat() {
 
         for (const line of lines) {
           if (!line.trim()) continue;
-          const event = JSON.parse(line) as { type: string; text?: string; sources?: Source[]; error?: string };
+          try {
+            const event = JSON.parse(line) as { type: string; text?: string; sources?: Source[]; error?: string };
 
-          if (event.type === "delta" && event.text) {
-            setChat((prev) =>
-              prev.map((turn, idx) => (idx === assistantIndex ? { ...turn, text: turn.text + event.text } : turn))
-            );
-          }
+            if (event.type === "delta" && event.text) {
+              setChat((prev) =>
+                prev.map((turn, idx) => (idx === assistantIndex ? { ...turn, text: turn.text + event.text } : turn))
+              );
+            }
 
-          if (event.type === "sources" && event.sources) {
-            setChat((prev) =>
-              prev.map((turn, idx) => (idx === assistantIndex ? { ...turn, sources: event.sources } : turn))
-            );
-          }
+            if (event.type === "sources" && event.sources) {
+              setChat((prev) =>
+                prev.map((turn, idx) => (idx === assistantIndex ? { ...turn, sources: event.sources } : turn))
+              );
+            }
 
-          if (event.type === "error") {
-            throw new Error(event.error || "Streaming error");
+            if (event.type === "error") {
+              throw new Error(event.error || "Streaming error");
+            }
+          } catch (e) {
+            console.error("Error parsing stream line:", line, e);
           }
         }
       }
@@ -89,41 +111,89 @@ export default function PdfChat() {
 
   return (
     <main className="shell">
-      <section className="panel">
-        <h1>Policy Navigator</h1>
-        <p className="status">This chat is connected to the indexed PDF: Book and policies.pdf</p>
+      <header className="panel">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <FileText size={32} color="var(--primary)" />
+          <div>
+            <h1>Policy Navigator</h1>
+            <p className="status">Connected to: Book and policies.pdf</p>
+          </div>
+        </div>
+      </header>
 
+      <section className="chatlog">
+        {chat.length === 0 && (
+          <div style={{ textAlign: "center", padding: "4rem 2rem", opacity: 0.5 }}>
+            <Bot size={48} style={{ margin: "0 auto 1rem" }} />
+            <p>Welcome! Ask me anything about the loaded policies.</p>
+          </div>
+        )}
+        {chat.map((turn, idx) => {
+          const dir = getDirection(turn.text);
+          return (
+            <article key={idx} className={`bubble ${turn.role} ${dir}`}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                {turn.role === "user" ? <User size={14} /> : <Bot size={14} />}
+                <strong>{turn.role === "user" ? "You" : "Assistant"}</strong>
+              </div>
+
+              <div className="markdown-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {turn.text || (busy && idx === chat.length - 1 ? "..." : "")}
+                </ReactMarkdown>
+              </div>
+
+              {turn.sources && turn.sources.length > 0 && (
+                <details>
+                  <summary>
+                    Sources ({turn.sources.length})
+                  </summary>
+                  <ul>
+                    {turn.sources.map((s, i) => (
+                      <li key={i}>
+                        <div style={{ fontWeight: 600, marginBottom: "0.25rem", color: "var(--primary)" }}>
+                          {s.page_number ? `Page ${s.page_number}` : "Page unknown"}
+                        </div>
+                        <p>{s.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </article>
+          );
+        })}
+        <div ref={chatEndRef} />
+      </section>
+
+      <footer className="panel" style={{ marginTop: "auto", marginBottom: 0 }}>
         <form onSubmit={handleAsk} className="row">
           <input
             placeholder="Ask a policy question..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            disabled={busy}
           />
-          <button type="submit" disabled={!canAsk}>{busy ? "Streaming..." : "Send"}</button>
+          <button type="submit" disabled={!canAsk}>
+            {busy ? <div className="spinner" /> : <Send size={18} />}
+            <span>{busy ? "Thinking..." : "Send"}</span>
+          </button>
         </form>
-      </section>
+      </footer>
 
-      <section className="chatlog">
-        {chat.map((turn, idx) => (
-          <article key={idx} className={`bubble ${turn.role}`}>
-            <strong>{turn.role === "user" ? "You" : "Assistant"}</strong>
-            <p>{turn.text}</p>
-            {turn.sources && turn.sources.length > 0 && (
-              <details>
-                <summary>Sources</summary>
-                <ul>
-                  {turn.sources.map((s, i) => (
-                    <li key={i}>
-                      <strong>{s.page_number ? `Page ${s.page_number}` : "Page unknown"}:</strong>{" "}
-                      {s.content.slice(0, 250)}...
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </article>
-        ))}
-      </section>
+      <style jsx>{`
+        .spinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </main>
   );
 }
