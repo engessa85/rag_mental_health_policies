@@ -10,7 +10,7 @@ A RAG (retrieval-augmented generation) chat app over a single preloaded PDF (`Bo
 - `backend/` — Django + Django REST Framework API (`config/` project, `rag/` app).
 - `db` — Postgres with the `pgvector` extension, storing chunk embeddings.
 
-LLM chat completions and embeddings both go through **OpenRouter** (OpenAI-compatible API via the `openai` Python client).
+LLM chat completions and embeddings both go through **OpenAI directly** (via the `openai` Python client). Default chat model is `gpt-5-mini` (GPT-5 models require `max_completion_tokens` instead of the deprecated `max_tokens`, reject a custom `temperature`, and burn hidden reasoning tokens out of the same completion-token budget as visible output — see `_chat_completion_kwargs` in `services.py`, which branches on model name to handle this).
 
 ## Commands
 
@@ -18,7 +18,7 @@ Everything is designed to run via Docker Compose; there are no host-native dev s
 
 ```bash
 # First-time setup
-cp .env.example .env   # then set OPENROUTER_API_KEY
+cp .env.example .env   # then set OPENAI_API_KEY
 
 # Build and run all services (frontend :3000, backend :8000, db :5432)
 docker compose up --build
@@ -50,13 +50,13 @@ On every backend container start, in order: enable the `vector` extension → ru
 
 ### Backend (`backend/rag/`)
 
-- `models.py` — `Document` (one row per ingested PDF) and `DocumentChunk` (page-scoped text chunk + `VectorField(dimensions=768)` embedding, FK to `Document`). Embedding dimension is hardcoded to 768 in the model but also configurable via `OPENROUTER_EMBEDDING_DIM` in settings — these must stay in sync, and changing the dimension requires a new migration.
+- `models.py` — `Document` (one row per ingested PDF) and `DocumentChunk` (page-scoped text chunk + `VectorField(dimensions=768)` embedding, FK to `Document`). Embedding dimension is hardcoded to 768 in the model but also configurable via `OPENAI_EMBEDDING_DIM` in settings — these must stay in sync, and changing the dimension requires a new migration.
 - `services.py` — all RAG logic, no business logic lives in views:
   - `extract_pdf_pages` / `chunk_text` — PDF → per-page text → fixed-size character chunks with overlap (`CHUNK_SIZE`/`CHUNK_OVERLAP`), no token-aware splitting.
-  - `embed_texts` — batches embedding calls (batch size 64) through OpenRouter.
+  - `embed_texts` — batches embedding calls (batch size 64) through OpenAI.
   - `ingest_pdf` / `ingest_pdf_path` — full ingestion pipeline: extract → chunk → embed → bulk create `DocumentChunk` rows.
   - `retrieve_context` — embeds the query, ranks `DocumentChunk`s by `CosineDistance` (pgvector), optionally scoped to one `document_id`, limited to `TOP_K`.
-  - `generate_answer` / `stream_answer` — build a context block from retrieved chunks (page-cited), call the chat model. Both fall back to `_exact_quote_answer` (raw excerpts, no LLM) when `USE_GENERATIVE_ANSWER=0` **or** when the provider call raises a quota/rate-limit error (`_is_quota_error`) — this fallback path is a deliberate degradation, not a bug, so preserve it when touching error handling.
+  - `generate_answer` / `stream_answer` — build a context block from retrieved chunks (page-cited), call the chat model via `_chat_completion_kwargs()` (model-aware param handling, see above). Both fall back to `_exact_quote_answer` (raw excerpts, no LLM) when `USE_GENERATIVE_ANSWER=0` **or** when the provider call raises a quota/rate-limit/insufficient-credit error (`_is_quota_error`) — this fallback path is a deliberate degradation, not a bug, so preserve it when touching error handling.
 - `views.py` — thin `@api_view` functions; `chat_stream` returns newline-delimited JSON (`application/x-ndjson`) with `{"type": "delta"|"sources"|"done"|"error"}` events, consumed by the frontend's manual `ReadableStream` reader (see `PdfChat.tsx`).
 - `urls.py` → mounted at `/api/` by `config/urls.py`. Endpoints: `health/`, `init-vector/`, `upload/`, `chat/`, `chat/stream/`.
 - `management/commands/preload_pdf.py` — idempotent by filename (`settings.PRELOAD_PDF_NAME`), used by the entrypoint.
@@ -74,6 +74,6 @@ Single-component app: `components/PdfChat.tsx` owns all chat state and talks dir
 
 ### Cross-service contracts to keep in sync
 
-- `OPENROUTER_EMBEDDING_DIM` (env) must match `DocumentChunk.embedding`'s `VectorField(dimensions=...)` in `models.py` — mismatches require a new migration.
+- `OPENAI_EMBEDDING_DIM` (env) must match `DocumentChunk.embedding`'s `VectorField(dimensions=...)` in `models.py` — mismatches require a new migration.
 - The ndjson event shape in `views.chat_stream`'s `event_stream()` and the parser in `PdfChat.tsx`'s `handleAsk` must be changed together.
 - `docker-compose.yml` env defaults, `.env.example`, and `config/settings.py` `os.getenv` defaults should stay consistent when adding new settings.
