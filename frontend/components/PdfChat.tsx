@@ -135,7 +135,7 @@ export default function PdfChat() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <FileText size={32} color="var(--primary)" />
           <div>
-            <h1>Policy Navigator</h1>
+            <h1>PsychNurse AI</h1>
             <p className="status">Connected to: Book and policies.pdf</p>
           </div>
         </div>
@@ -202,6 +202,12 @@ export default function PdfChat() {
             <span>{busy ? "Thinking..." : "Send"}</span>
           </button>
         </form>
+        <p className="disclaimer" dir="rtl" style={{ marginTop: "0.75rem", fontSize: "0.8rem", opacity: 0.7, textAlign: "center" }}>
+          ⚠️ تنبيه: ⁠PsychNurse AI⁠ هو أداة ذكاء اصطناعي للمساندة السريرية وقد يرتكب أخطاء. ولا يُعد بديلاً عن التقييم التمريضي المباشر أو التوجيهات الطبية الرسمية.
+        </p>
+        <p className="disclaimer" dir="ltr" style={{ marginTop: "0.25rem", fontSize: "0.8rem", opacity: 0.7, textAlign: "center" }}>
+          ⚠️ Disclaimer: ⁠PsychNurse AI⁠ is a clinical decision-support tool and may make errors. Always verify critical information.
+        </p>
       </footer>
 
       <style jsx>{`
